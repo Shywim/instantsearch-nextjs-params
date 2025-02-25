@@ -1,19 +1,41 @@
 import Head from "next/head";
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-import styles from "@/styles/Home.module.css";
+import { Hit } from "instantsearch.js";
+import {
+  Carousel,
+  Configure,
+  getServerState,
+  Highlight,
+  Hits,
+  InstantSearch,
+  InstantSearchServerState,
+  InstantSearchSSRProvider,
+  Pagination,
+  RefinementList,
+  SearchBox,
+  TrendingItems,
+} from "react-instantsearch";
+import { Panel } from "@/Panel";
+import { liteClient as algoliasearch } from "algoliasearch/lite";
+import { renderToString } from "react-dom/server";
+import singletonRouter from "next/router";
+import { createInstantSearchRouterNext } from "react-instantsearch-router-nextjs";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import "instantsearch.css/themes/satellite.css";
+import Link from "next/link";
+import { GetServerSidePropsContext } from "next";
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const searchClient = algoliasearch(
+  "latency",
+  "6be0576ff61c053d5f9a3225e2a90f76",
+);
 
-export default function Home() {
+export default function Home({
+  serverState,
+  serverUrl,
+}: {
+  serverUrl: string;
+  serverState?: InstantSearchServerState;
+}) {
   return (
     <>
       <Head>
@@ -22,96 +44,116 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <div
-        className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}
-      >
-        <main className={styles.main}>
-          <Image
-            className={styles.logo}
-            src="/next.svg"
-            alt="Next.js logo"
-            width={180}
-            height={38}
-            priority
-          />
-          <ol>
-            <li>
-              Get started by editing <code>src/pages/index.tsx</code>.
-            </li>
-            <li>Save and see your changes instantly.</li>
-          </ol>
 
-          <div className={styles.ctas}>
-            <a
-              className={styles.primary}
-              href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Image
-                className={styles.logo}
-                src="/vercel.svg"
-                alt="Vercel logomark"
-                width={20}
-                height={20}
-              />
-              Deploy now
+      <div>
+        <header className="header">
+          <h1 className="header-title">
+            <Link href="/">Getting started</Link>
+          </h1>
+          <p className="header-subtitle">
+            using{" "}
+            <a href="https://github.com/algolia/instantsearch/tree/master/packages/react-instantsearch">
+              React InstantSearch
             </a>
-            <a
-              href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.secondary}
+          </p>
+        </header>
+
+        <div className="container">
+          <InstantSearchSSRProvider {...serverState}>
+            <InstantSearch
+              searchClient={searchClient}
+              indexName="instant_search"
+              insights={true}
+              routing={{
+                router: createInstantSearchRouterNext({
+                  singletonRouter,
+                  serverUrl,
+                }),
+              }}
             >
-              Read our docs
-            </a>
-          </div>
-        </main>
-        <footer className={styles.footer}>
-          <a
-            href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              aria-hidden
-              src="/file.svg"
-              alt="File icon"
-              width={16}
-              height={16}
-            />
-            Learn
-          </a>
-          <a
-            href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              aria-hidden
-              src="/window.svg"
-              alt="Window icon"
-              width={16}
-              height={16}
-            />
-            Examples
-          </a>
-          <a
-            href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              aria-hidden
-              src="/globe.svg"
-              alt="Globe icon"
-              width={16}
-              height={16}
-            />
-            Go to nextjs.org →
-          </a>
-        </footer>
+              <Configure hitsPerPage={8} />
+              <div className="search-panel">
+                <div className="search-panel__filters">
+                  <Panel header="brand">
+                    <RefinementList attribute="brand" />
+                  </Panel>
+                </div>
+
+                <div className="search-panel__results">
+                  <SearchBox placeholder="" className="searchbox" />
+                  <Hits hitComponent={HitComponent} />
+
+                  <div className="pagination">
+                    <Pagination />
+                  </div>
+                  <div>
+                    <TrendingItems
+                      itemComponent={ItemComponent}
+                      limit={6}
+                      layoutComponent={Carousel}
+                    />
+                  </div>
+                </div>
+              </div>
+            </InstantSearch>
+          </InstantSearchSSRProvider>
+        </div>
       </div>
     </>
   );
+}
+
+type HitType = Hit<{
+  image: string;
+  name: string;
+  description: string;
+}>;
+
+function HitComponent({ hit }: { hit: HitType }) {
+  return (
+    <article>
+      <h1>
+        <a href={`/products.html?pid=${hit.objectID}`}>
+          <Highlight attribute="name" hit={hit} />
+        </a>
+      </h1>
+      <p>
+        <Highlight attribute="description" hit={hit} />
+      </p>
+      <a href={`/products.html?pid=${hit.objectID}`}>See product</a>
+    </article>
+  );
+}
+
+function ItemComponent({ item }: { item: Hit }) {
+  return (
+    <div>
+      <article>
+        <div>
+          <img src={item.image} />
+          <h2>{item.name}</h2>
+        </div>
+        <a href={`/products.html?pid=${item.objectID}`}>See product</a>
+      </article>
+    </div>
+  );
+}
+
+export async function getServerSideProps({ req }: GetServerSidePropsContext) {
+  const protocol = req.headers.referer?.split("://")[0] || "https";
+  const serverUrl = `${protocol}://${req.headers.host}${req.url}`;
+  const serverState = await getServerState(<Home serverUrl={serverUrl} />, {
+    renderToString,
+  });
+
+  searchClient.search({
+    requests: [{ indexName: "instant_search", filters: "objectID:5477500" }],
+  });
+
+  return {
+    props: {
+      serverState,
+      serverUrl,
+    },
+  };
 }
